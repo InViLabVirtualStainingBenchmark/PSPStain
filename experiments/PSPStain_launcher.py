@@ -6,10 +6,9 @@ class Launcher(TmuxLauncher):
         return [
             # Command 0
             Options(
-                dataroot="",
-                
-                name="train",
-                checkpoints_dir='checkpoints',
+                dataroot="datasets/MIST/",                
+                name="mist",
+                checkpoints_dir='checkpoints/',
                 model='PSPStain',
                 CUT_mode="FastCUT",
                 
@@ -64,5 +63,6 @@ class Launcher(TmuxLauncher):
         for opt in opts:
             opt.set(crop_size=1024, num_test=1000)
             opt.remove('n_epochs', 'n_epochs_decay', 'update_html_freq',
-                       'save_epoch_freq', 'continue_train', 'epoch_count')
+                      'save_epoch_freq', 'continue_train', 'epoch_count')
+            opt.remove('unet_seg')
         return ["python test.py " + str(opt.set(phase=phase)) for opt in opts]

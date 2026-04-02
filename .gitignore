@@ -1,0 +1,22 @@
+# Ignore datasets
+datasets/
+data/
+*/trainA/
+*/trainB/
+*/testA/
+*/testB/
+
+# Ignore results
+results/
+
+# Ignore checkpoints
+checkpoints/
+*.pth
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore IDE files
+.idea/
+.vscode/
