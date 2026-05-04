@@ -1,19 +1,22 @@
+# After env create, run manually:
+# pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
+# pip install "numpy<2"
 name: PSPStain
 channels:
-- pytorch
 - conda-forge
 - defaults
 dependencies:
 - python=3.9
-- pytorch==1.12.1
-- torchvision==0.13.1
-- cudatoolkit=11.6
 - scipy
 - dominate
-- torchvision
-- opencv
-- Pillow
-- numpy
-- visdom
+- pillow
+- numpy<2
 - packaging
-- GPUtil
+- pip
+- pip:
+    - opencv-python==4.8.1.78
+    - visdom
+    - GPUtil
+    - scikit-image
+    - pytorch-msssim
+    - matplotlib

@@ -61,7 +61,7 @@ Conda env name should follow the convention: the model's short name.
 -->
 
 - **Python version:** 3.9
-- **PyTorch version:** 1.12.1
+- **PyTorch version:** 1.13.1+cu117.
 - **CUDA version:** 12.1 (driver) cudatoolkit 11.6 bundled via conda
 - **Conda environment name:** PSPStain
 - **Date tested:** 30.04.2026
@@ -82,6 +82,8 @@ If installation succeeded without issues, write "No issues."
 
 ```bash
 conda env create -f environment.yml
+# After env create, run manually:
+pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
 pip install "numpy<2"
 ```
 
@@ -96,6 +98,9 @@ If no issues, write "None."
 | --- | --- |
 | NumPy 2.0.2 installed by default, torchvision 0.13.1 crashes with ARRAY_API error | pip install "numpy<2" -- downgraded to 1.26.4 |
 | visdom 0.2.4 missing networkx dependency | Not fixed -- networkx not needed since --display_id 0 disables visdom entirely |
+| PyTorch 1.12.1 with cudatoolkit 11.6 does not support RTX 4090 (sm_89) -- nvrtc invalid architecture error | Upgraded to torch==1.13.1+cu117 installed via pip wheel |
+| conda solver installs CPU-only PyTorch when given pytorch+nvidia channels | Removed PyTorch from environment.yml entirely; install manually via pip after env create |
+| scikit-image, pytorch-msssim, matplotlib missing from environment.yml | Added to pip section of environment.yml |
 
 ### GPU Confirmation
 
@@ -105,7 +110,7 @@ Command: python -c "import torch; print(torch.__version__, torch.cuda.is_availab
 -->
 
 ```
-1.12.1 True NVIDIA GeForce RTX 4090
+1.13.1+cu117 True NVIDIA GeForce RTX 4090
 ```
 
 ---
@@ -130,35 +135,40 @@ If no conversion was needed, write "None -- dataset used as downloaded."
     ORIG_BCI=~/internship-models/datasets/original/BCI_dataset
     OUT=~/internship-models/datasets/PSPStain-BCI-smoke
     mkdir -p $OUT/trainA $OUT/trainB $OUT/valA $OUT/valB
-    ls $ORIG_BCI/HE/train | grep -v Zone.Identifier | sort | head -50 | while read f; do ln -sf $ORIG_BCI/HE/train/$f $OUT/trainA/$f; done
-    ls $ORIG_BCI/IHC/train | grep -v Zone.Identifier | sort | head -50 | while read f; do ln -sf $ORIG_BCI/IHC/train/$f $OUT/trainB/$f; done
-    ls $ORIG_BCI/HE/test | grep -v Zone.Identifier | sort | head -20 | while read f; do ln -sf $ORIG_BCI/HE/test/$f $OUT/valA/$f; done
-    ls $ORIG_BCI/IHC/test | grep -v Zone.Identifier | sort | head -20 | while read f; do ln -sf $ORIG_BCI/IHC/test/$f $OUT/valB/$f; done
+    ls $ORIG_BCI/HE/train | sort | head -50 | while read f; do ln -sf $ORIG_BCI/HE/train/$f $OUT/trainA/$f; done
+    ls $ORIG_BCI/IHC/train | sort | head -50 | while read f; do ln -sf $ORIG_BCI/IHC/train/$f $OUT/trainB/$f; done
+    ls $ORIG_BCI/HE/test | sort | head -20 | while read f; do ln -sf $ORIG_BCI/HE/test/$f $OUT/valA/$f; done
+    ls $ORIG_BCI/IHC/test | sort | head -20 | while read f; do ln -sf $ORIG_BCI/IHC/test/$f $OUT/valB/$f; done
 
     # MIST smoke subset (symlinks, no copy)
     ORIG_MIST=~/internship-models/datasets/original/MIST/HER2-004/TrainValAB
     OUT_MIST=~/internship-models/datasets/PSPStain-MIST-smoke
     mkdir -p $OUT_MIST/trainA $OUT_MIST/trainB $OUT_MIST/valA $OUT_MIST/valB
-    ls $ORIG_MIST/trainA | grep -v Zone.Identifier | sort | head -50 | while read f; do ln -sf $ORIG_MIST/trainA/$f $OUT_MIST/trainA/$f; done
-    ls $ORIG_MIST/trainB | grep -v Zone.Identifier | sort | head -50 | while read f; do ln -sf $ORIG_MIST/trainB/$f $OUT_MIST/trainB/$f; done
-    ls $ORIG_MIST/valA | grep -v Zone.Identifier | sort | head -20 | while read f; do ln -sf $ORIG_MIST/valA/$f $OUT_MIST/valA/$f; done
-    ls $ORIG_MIST/valB | grep -v Zone.Identifier | sort | head -20 | while read f; do ln -sf $ORIG_MIST/valB/$f $OUT_MIST/valB/$f; done
+    ls $ORIG_MIST/trainA | sort | head -50 | while read f; do ln -sf $ORIG_MIST/trainA/$f $OUT_MIST/trainA/$f; done
+    ls $ORIG_MIST/trainB | sort | head -50 | while read f; do ln -sf $ORIG_MIST/trainB/$f $OUT_MIST/trainB/$f; done
+    ls $ORIG_MIST/valA | sort | head -20 | while read f; do ln -sf $ORIG_MIST/valA/$f $OUT_MIST/valA/$f; done
+    ls $ORIG_MIST/valB | sort | head -20 | while read f; do ln -sf $ORIG_MIST/valB/$f $OUT_MIST/valB/$f; done
     ```
     
 - **Final folder layout used:**
     
     ```
     # sketch the folder tree here, e.g.:
-    # data/
-    #   train/
-    #     A/   <-- H&E source images
-    #     B/   <-- IHC target images
-    #   val/
-    #     A/
-    #     B/
+    # PSPStain-BCI-smoke/
+    #    trainA/   <-- 50 H&E images (symlinks)
+    #    trainB/   <-- 50 IHC images (symlinks)
+    #    valA/     <-- 20 H&E images (symlinks)
+    #    valB/     <-- 20 IHC images (symlinks)
+
+    #PSPStain-MIST-smoke/
+    #    trainA/   <-- 50 H&E images (symlinks)
+    #    trainB/   <-- 50 IHC images (symlinks)
+    #    valA/     <-- 20 H&E images (symlinks)
+    #    valB/     <-- 20 IHC images (symlinks)
     ```
     
-- **Number of images used for smoke test (train / test):** train 50 / test 20
+- **Number of images used for smoke test (train / test):** 
+    - train 50 / test 20
 
 ---
 
@@ -199,9 +209,9 @@ Valid outcomes: "images look like expected domain", "blank/grey output", "wrong 
     ```bash
     export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
     # BCI
-    python test.py --dataroot ~/internship-models/datasets/PSPStain-BCI-smoke --name BCI-pretrained --checkpoints_dir checkpoints --model PSPStain --CUT_mode FastCUT --netG resnet_6blocks --netD n_layers --n_layers_D 5 --normG instance --normD instance --weight_norm spectral --dataset_mode aligned --direction AtoB --load_size 1024 --crop_size 1024 --phase val --num_test 20 --gpu_ids 0
+    python test.py --dataroot ~/internship-models/datasets/PSPStain-BCI-smoke --name BCI-pretrained --checkpoints_dir checkpoints --model PSPStain --CUT_mode FastCUT --netG resnet_6blocks --netD n_layers --n_layers_D 5 --ndf 32 --normG instance --normD instance --weight_norm spectral --dataset_mode aligned --direction AtoB --load_size 1024 --crop_size 1024 --phase val --num_test 20 --no_flip --gpu_ids 0
     # MIST-HER2
-    python test.py --dataroot ~/internship-models/datasets/PSPStain-MIST-smoke --name MIST-pretrained --checkpoints_dir checkpoints --model PSPStain --CUT_mode FastCUT --netG resnet_6blocks --netD n_layers --n_layers_D 5 --normG instance --normD instance --weight_norm spectral --dataset_mode aligned --direction AtoB --load_size 1024 --crop_size 1024 --phase val --num_test 20 --gpu_ids 0
+    python test.py --dataroot ~/internship-models/datasets/PSPStain-MIST-smoke --name MIST-pretrained --checkpoints_dir checkpoints --model PSPStain --CUT_mode FastCUT --netG resnet_6blocks --netD n_layers --n_layers_D 5 --ndf 32 --normG instance --normD instance --weight_norm spectral --dataset_mode aligned --direction AtoB --load_size 1024 --crop_size 1024 --phase val --num_test 20 --no_flip --gpu_ids 0
     ```
     
 - **Output folder:** results/BCI-pretrained/val_latest/images/fake_B/
@@ -227,17 +237,41 @@ Monitor GPU memory with: watch -n 1 nvidia-smi (run in a second terminal).
 - **Script / command run:**
     
     ```bash
-    # paste exact command here
+    # BCI
+    ## Train
+    python train.py --dataroot ~/internship-models/datasets/PSPStain-BCI-smoke --name PSPStain-BCI-scratch --checkpoints_dir checkpoints --model PSPStain --CUT_mode FastCUT --netG resnet_6blocks --netD n_layers --n_layers_D 5 --ndf 32 --normG instance --normD instance --weight_norm spectral --dataset_mode aligned --direction AtoB --load_size 1024 --crop_size 512 --batch_size 1 --n_epochs 1 --n_epochs_decay 0 --save_epoch_freq 1 --display_id 0 --unet_seg BCI_unet_seg --gpu_ids 0
+
+    ## Test
+    python test.py --dataroot ~/internship-models/datasets/PSPStain-BCI-smoke --name PSPStain-BCI-scratch --checkpoints_dir checkpoints --model PSPStain --CUT_mode FastCUT --netG resnet_6blocks --netD n_layers --n_layers_D 5 --ndf 32 --normG instance --normD instance --weight_norm spectral --dataset_mode aligned --direction AtoB --load_size 1024 --crop_size 1024 --phase val --num_test 20 --no_flip --gpu_ids 0
+    
+    ## Evaluate in another terminal with evluation specific environtment (vs-benchmark)
+    conda activate vs-benchmark
+
+    python ~/internship-models/evaluate/evaluate.py --pred results/PSPStain-BCI-scratch/val_latest/images/fake_B --gt ~/internship-models/datasets/PSPStain-BCI-smoke/valB --model_name PSPStain --dataset_name BCI --split_name scratch-1epoch-smoke --match_by stem --output ~/internship-models/results.csv
+
+    # MIST-HER2
+    ## Train
+    python train.py --dataroot ~/internship-models/datasets/PSPStain-MIST-smoke --name PSPStain-MIST-scratch --checkpoints_dir checkpoints --model PSPStain --CUT_mode FastCUT --netG resnet_6blocks --netD n_layers --n_layers_D 5 --ndf 32 --normG instance --normD instance --weight_norm spectral --dataset_mode aligned --direction AtoB --load_size 1024 --crop_size 512 --batch_size 1 --n_epochs 1 --n_epochs_decay 0 --save_epoch_freq 1 --display_id 0 --unet_seg MIST_unet_seg --gpu_ids 0
+
+    ## Test
+    python test.py --dataroot ~/internship-models/datasets/PSPStain-MIST-smoke --name PSPStain-MIST-scratch --checkpoints_dir checkpoints --model PSPStain --CUT_mode FastCUT --netG resnet_6blocks --netD n_layers --n_layers_D 5 --ndf 32 --normG instance --normD instance --weight_norm spectral --dataset_mode aligned --direction AtoB --load_size 1024 --crop_size 1024 --phase val --num_test 20 --no_flip --gpu_ids 0
+
+    ## Evaluate in another terminal with evluation specific environtment (vs-benchmark)
+    conda activate vs-benchmark
+
+    python ~/internship-models/evaluate/evaluate.py --pred results/PSPStain-MIST-scratch/val_latest/images/fake_B --gt ~/internship-models/datasets/PSPStain-MIST-smoke/valB --model_name PSPStain --dataset_name MIST-HER2 --split_name scratch-1epoch-smoke --match_by stem --output ~/internship-models/results.csv
     ```
     
-- **Dataset used:**
-- **Epochs run:**
-- **Batch size:**
-- **Input resolution:**
+- **Dataset used:** BCI & MIST-HER2
+- **Epochs run:** 1
+- **Batch size:** 1
+- **Input resolution:** 
 - **Time per epoch (approx):**
 - **Peak GPU memory (approx, from nvidia-smi):**
-- **Checkpoint saved:** yes / no
+- **Checkpoint saved:** yes 
 - **Checkpoint path:**
+    - /PSPStain/checkpoints/PSPStain-BCI-scratch
+    - /PSPStain/checkpoints/PSPStain-MIST-scratch
 - **Crash or error during training:**
 <!-- "None" if clean. Otherwise paste the key error line and the fix applied. -->
 
@@ -252,9 +286,9 @@ This is not a metric -- just a check that the model produced something in the ri
 Record one or two example output filenames so the check is reproducible.
 -->
 
-- **Output folder:**
+- **Output folder:** /PSPStain/results
 - **Example output filenames:**
-- **Dimensions match input:** yes / no
+- **Dimensions match input:** yes (training uses --crop_size 512 but inference always uses 1024.)
 - **Visual sanity check:**
 <!-- e.g. "outputs show IHC-like staining, structures roughly aligned with H&E input" -->
 - **Any obvious artifacts or failure modes:**
@@ -272,7 +306,8 @@ Add rows as needed.
 
 | File | Change Description | Reason |
 | --- | --- | --- |
-|  |  |  |
+| options/test_options.py | Added parser.add_argument('--unet_seg', type=str, default='BCI_unet_seg')
+ to TestOptions.initialize() | PSPStainModel reads opt.unet_seg at inference time to load the UNet segmentation weights; original TestOptions did not define this argument, causing an AttributeError |
 |  |  |  |
 
 <!--
@@ -295,8 +330,8 @@ This file is what gets adapted for the HPC migration later.
 Note any packages that are unusual, very large, or likely to cause conflicts on the cluster.
 -->
 
-- **Environment file:** `environment_<model-name>.yml`
-- **Committed to fork:** yes / no
+- **Environment file:** `environment_PSPStain.yml`
+- **Committed to fork:** yes
 - **Notes on unusual or heavy dependencies:**
 <!-- e.g. "requires openslide-python which needs a system-level apt install" -->
 
@@ -312,12 +347,26 @@ dependencies that require apt/system installs, very large model downloads.
 Leave blank until local test is complete.
 -->
 
-- **Display/GUI dependencies to remove or neutralize:**
-- **System-level dependencies (non-pip/conda):**
+- **Display/GUI dependencies to remove or neutralize:** visdom is imported but not needed. Pass --display_id 0 on all train.py calls.
+No code change required -- the flag is sufficient.
+- **System-level dependencies (non-pip/conda):** 
+    - None. LD_LIBRARY_PATH=/usr/lib/wsl/lib is a WSL2-only workaround and is not
+needed on the cluster.
 - **Estimated GPU memory requirement:**
-- **Estimated storage requirement (weights + data):**
+- **Estimated storage requirement (weights + data):** 
+    - Pretrained weights: ~62 MB total (31 MB x 2).
+    - UNet segmentation weights: ~negligible, bundled in repo pretrain/ folder.
+    - BCI full dataset: ~3 GB. MIST-HER2 full dataset: ~3 GB.
+    - Allow ~10 GB total on $VSC_SCRATCH per dataset during training.
 - **Other notes for cluster adaptation:**
-
+    - CRITICAL: The cluster module stack provides PyTorch 2.1.2. PSPStain requires
+    - PyTorch 1.13.1+cu117. The system-site-packages venv approach used for other models cannot be used here -- the system PyTorch version is incompatible.
+    - A fully self-contained venv (without --system-site-packages) is required, with PyTorch 1.13.1+cu117 installed via pip wheel inside the venv. All pip dependencies must be installed inside the venv:
+    torch==1.13.1+cu117, torchvision==0.14.1+cu117 (via [pytorch.org](http://pytorch.org/) wheel index),
+    numpy<2, opencv-python==4.8.1.78, scikit-image, pytorch-msssim, matplotlib, visdom, GPUtil, dominate, scipy, packaging.
+    - The pretrain/ folder (BCI_unet_seg.pth, MIST_unet_seg.pth) must be transferred to the cluster alongside the repo -- it is bundled in the repo root and is not downloaded at runtime.
+    - PSPStain does not fetch any weights or assets at runtime. Compute nodes having no outbound internet access is not a problem for this model.
+ 
 ---
 
 ## Summary
@@ -328,7 +377,7 @@ Be specific. Include the overall pass/fail verdict.
 This is the first thing someone reads when picking this model back up.
 -->
 
-**Overall result:** PASS / FAIL / PARTIAL
+**Overall result:** PASS
 
 <!-- Example pass:
 "[Model] smoke test completed on [date]. Inference with pretrained weights passed on 10 BCI test images.
