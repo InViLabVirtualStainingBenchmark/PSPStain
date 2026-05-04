@@ -90,4 +90,3 @@ dependencies:
       - visdom==0.2.4
       - websocket-client==1.9.0
       - zipp==3.23.1
-prefix: /home/thomas/miniconda3/envs/PSPStain
