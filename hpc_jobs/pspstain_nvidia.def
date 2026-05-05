@@ -1,0 +1,45 @@
+Bootstrap: docker
+From: pytorch/pytorch:1.13.1-cuda11.6-cudnn8-runtime
+
+%post
+    apt-get update -y && apt-get install -y git && apt-get clean && rm -rf /var/lib/apt/lists/*
+    pip install --no-cache-dir --upgrade pip
+    pip install --no-cache-dir \
+        "numpy<2" \
+        opencv-python-headless==4.8.1.78 \
+        scikit-image \
+        pytorch-msssim \
+        matplotlib \
+        GPUtil \
+        dominate \
+        scipy \
+        packaging
+
+%labels
+    Author vsc21212
+    Model PSPStain
+    BaseImage pytorch/pytorch:1.13.1-cuda11.6-cudnn8-runtime
+    PyTorch 1.13.1+cu116
+    Python 3.10
+    Benchmark InViLabVirtualStainingBenchmark
+
+%help
+    PSPStain container for the InViLab virtual staining benchmark.
+    Python 3.10, PyTorch 1.13.1 (cu116), CUDA 11.6 runtime.
+    The cluster CUDA 12.x driver is backward compatible with this runtime.
+
+    Training (BCI example):
+      apptainer exec --nv \
+        -B $VSC_DATA:$VSC_DATA \
+        -B $VSC_SCRATCH/BCI.sqsh:/data/BCI:image-src=/ \
+        $VSC_SCRATCH/containers/pspstain_nvidia.sif \
+        python $VSC_DATA/projects/pspstain/code/pspstain/train.py \
+          --dataroot /data/BCI ...
+
+    Inference (BCI example):
+      apptainer exec --nv \
+        -B $VSC_DATA:$VSC_DATA \
+        -B $VSC_SCRATCH/BCI.sqsh:/data/BCI:image-src=/ \
+        $VSC_SCRATCH/containers/pspstain_nvidia.sif \
+        python $VSC_DATA/projects/pspstain/code/pspstain/test.py \
+          --dataroot /data/BCI ...
