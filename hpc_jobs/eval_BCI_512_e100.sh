@@ -27,6 +27,9 @@ EVAL_CONTAINER="$VSC_SCRATCH/containers/evaluate_nvidia.sif"
 RESULTS_DIR="$VSC_DATA/projects/pspstain/outputs/results"
 RUN_NAME="BCI_512_e100"
 PRED_DIR="$RESULTS_DIR/$RUN_NAME/val_latest/images/fake_B"
+BCI_AB_SQSH="$VSC_SCRATCH/BCI-AB.sqsh"
+BCI_AB_MNT="$VSC_SCRATCH/sqsh_mnt/BCI-AB"
+GT_DIR="$BCI_AB_MNT/valB"
 
 # =========================
 # MODULES
@@ -47,10 +50,18 @@ fi
 echo "  found"
 
 echo ""
+echo "=== SquashFS check ==="
+if [ ! -f "$BCI_AB_SQSH" ]; then
+    echo "ERROR: BCI-AB squashfs not found: $BCI_AB_SQSH"
+    exit 1
+fi
+echo "  BCI-AB.sqsh found"
+
+echo ""
 echo "=== Prediction folder check ==="
 if [ ! -d "$PRED_DIR" ]; then
     echo "ERROR: Prediction folder not found: $PRED_DIR"
-    echo "Has infer_BCI_full.sh completed successfully?"
+    echo "Has infer_BCI_512_e100.sh completed successfully?"
     exit 1
 fi
 echo "  fake_B images: $(find "$PRED_DIR" -name "*.png" | wc -l)"
@@ -59,23 +70,28 @@ echo "  fake_B images: $(find "$PRED_DIR" -name "*.png" | wc -l)"
 # EVALUATION
 # =========================
 
+mkdir -p "$BCI_AB_MNT"
+
 echo ""
 echo "=== Starting BCI evaluation ==="
 echo "  predictions : $PRED_DIR"
-echo "  ground truth: /data/BCI-AB/valB"
+echo "  ground truth: $GT_DIR (inside BCI-AB.sqsh)"
 
-apptainer exec --nv \
+srun apptainer exec --nv \
     -B "$VSC_DATA:$VSC_DATA" \
-    -B "$VSC_SCRATCH/BCI-AB.sqsh:/data/BCI-AB:image-src=/" \
+    -B "$BCI_AB_SQSH:$BCI_AB_MNT:image-src=/" \
     "$EVAL_CONTAINER" \
     python "$VSC_DATA/evaluate/evaluate.py" \
-        --pred "$PRED_DIR" \
-        --gt /data/BCI-AB/valB \
-        --model_name PSPStain \
+        --pred         "$PRED_DIR" \
+        --gt           "$GT_DIR" \
+        --model_name   PSPStain \
         --dataset_name BCI \
-        --split_name full_e100 \
-        --match_by stem \
-        --output "$VSC_DATA/benchmark_results.csv"
+        --split_name   full_e100 \
+        --match_by     stem \
+        --output       "$VSC_DATA/benchmark_results.csv" \
+        --cellpose \
+        --cellpose_model cpsam \
+        --cellpose_n   100
 
 # =========================
 # POST-RUN REPORT

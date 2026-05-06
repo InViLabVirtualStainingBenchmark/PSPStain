@@ -27,6 +27,9 @@ EVAL_CONTAINER="$VSC_SCRATCH/containers/evaluate_nvidia.sif"
 RESULTS_DIR="$VSC_DATA/projects/pspstain/outputs/results"
 RUN_NAME="MIST-HER2_512_e100"
 PRED_DIR="$RESULTS_DIR/$RUN_NAME/val_latest/images/fake_B"
+MIST_SQSH="$VSC_SCRATCH/MIST-HER2.sqsh"
+MIST_MNT="$VSC_SCRATCH/sqsh_mnt/MIST-HER2"
+GT_DIR="$MIST_MNT/valB"
 
 # =========================
 # MODULES
@@ -47,10 +50,18 @@ fi
 echo "  found"
 
 echo ""
+echo "=== SquashFS check ==="
+if [ ! -f "$MIST_SQSH" ]; then
+    echo "ERROR: MIST-HER2 squashfs not found: $MIST_SQSH"
+    exit 1
+fi
+echo "  MIST-HER2.sqsh found"
+
+echo ""
 echo "=== Prediction folder check ==="
 if [ ! -d "$PRED_DIR" ]; then
     echo "ERROR: Prediction folder not found: $PRED_DIR"
-    echo "Has infer_MIST_full.sh completed successfully?"
+    echo "Has infer_MIST_512_e100.sh completed successfully?"
     exit 1
 fi
 echo "  fake_B images: $(find "$PRED_DIR" -name "*.png" | wc -l)"
@@ -59,23 +70,28 @@ echo "  fake_B images: $(find "$PRED_DIR" -name "*.png" | wc -l)"
 # EVALUATION
 # =========================
 
+mkdir -p "$MIST_MNT"
+
 echo ""
 echo "=== Starting MIST-HER2 evaluation ==="
 echo "  predictions : $PRED_DIR"
-echo "  ground truth: /data/MIST-HER2/valB"
+echo "  ground truth: $GT_DIR (inside MIST-HER2.sqsh)"
 
-apptainer exec --nv \
+srun apptainer exec --nv \
     -B "$VSC_DATA:$VSC_DATA" \
-    -B "$VSC_SCRATCH/MIST-HER2.sqsh:/data/MIST-HER2:image-src=/" \
+    -B "$MIST_SQSH:$MIST_MNT:image-src=/" \
     "$EVAL_CONTAINER" \
     python "$VSC_DATA/evaluate/evaluate.py" \
-        --pred "$PRED_DIR" \
-        --gt /data/MIST-HER2/valB \
-        --model_name PSPStain \
+        --pred         "$PRED_DIR" \
+        --gt           "$GT_DIR" \
+        --model_name   PSPStain \
         --dataset_name MIST-HER2 \
-        --split_name full_e100 \
-        --match_by stem \
-        --output "$VSC_DATA/benchmark_results.csv"
+        --split_name   full_e100 \
+        --match_by     stem \
+        --output       "$VSC_DATA/benchmark_results.csv" \
+        --cellpose \
+        --cellpose_model cpsam \
+        --cellpose_n   100
 
 # =========================
 # POST-RUN REPORT

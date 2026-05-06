@@ -22,7 +22,7 @@
 # Submit: sbatch infer_MIST_512_e100.sh
 #
 # Output images land at:
-#   $VSC_DATA/projects/pspstain/outputs/results/MIST-HER2_full_e100/val_latest/images/fake_B/
+#   $VSC_DATA/projects/pspstain/outputs/results/MIST-HER2_512_e100/val_latest/images/fake_B/
 
 set -euo pipefail
 
@@ -31,6 +31,8 @@ REPO_DIR="$VSC_DATA/projects/pspstain/code/pspstain"
 CHECKPOINTS_DIR="$VSC_DATA/projects/pspstain/outputs/checkpoints"
 RESULTS_DIR="$VSC_DATA/projects/pspstain/outputs/results"
 RUN_NAME="MIST-HER2_512_e100"
+MIST_SQSH="$VSC_SCRATCH/MIST-HER2.sqsh"
+MIST_MNT="$VSC_SCRATCH/sqsh_mnt/MIST-HER2"
 
 # =========================
 # MODULES
@@ -59,7 +61,7 @@ echo "=== Checkpoint check ==="
 CKPT_DIR="$CHECKPOINTS_DIR/$RUN_NAME"
 if [ ! -d "$CKPT_DIR" ]; then
     echo "ERROR: Checkpoint folder not found: $CKPT_DIR"
-    echo "Has train_MIST_full_e100.sh completed successfully?"
+    echo "Has train_MIST_512_e100.sh completed successfully?"
     exit 1
 fi
 echo "  Checkpoints found:"
@@ -67,10 +69,11 @@ find "$CKPT_DIR" -name "*.pth" | sort
 
 echo ""
 echo "=== Val dataset check ==="
+mkdir -p "$MIST_MNT"
 apptainer exec \
-    -B "$VSC_SCRATCH/MIST-HER2.sqsh:/data/MIST-HER2:image-src=/" \
+    -B "$MIST_SQSH:$MIST_MNT:image-src=/" \
     "$CONTAINER" \
-    bash -c 'echo "  valA: $(ls /data/MIST-HER2/valA | wc -l) images"'
+    bash -c "echo \"  valA: \$(ls $MIST_MNT/valA | wc -l) images\""
 
 echo ""
 echo "=== UNet weights check ==="
@@ -100,34 +103,35 @@ echo ""
 echo "=== Starting MIST-HER2 inference ==="
 echo "  run name    : $RUN_NAME"
 echo "  results dir : $RESULTS_DIR/$RUN_NAME"
+echo "  dataroot    : $MIST_MNT (inside MIST-HER2.sqsh)"
 
 apptainer exec --nv \
     -B "$VSC_DATA:$VSC_DATA" \
-    -B "$VSC_SCRATCH/MIST-HER2.sqsh:/data/MIST-HER2:image-src=/" \
+    -B "$MIST_SQSH:$MIST_MNT:image-src=/" \
     "$CONTAINER" \
     python test.py \
-        --dataroot /data/MIST-HER2 \
-        --name "$RUN_NAME" \
+        --dataroot     "$MIST_MNT" \
+        --name         "$RUN_NAME" \
         --checkpoints_dir "$CHECKPOINTS_DIR" \
-        --results_dir "$RESULTS_DIR" \
-        --model PSPStain \
-        --CUT_mode FastCUT \
-        --netG resnet_6blocks \
-        --netD n_layers \
-        --n_layers_D 5 \
-        --ndf 32 \
-        --normG instance \
-        --normD instance \
-        --weight_norm spectral \
+        --results_dir  "$RESULTS_DIR" \
+        --model        PSPStain \
+        --CUT_mode     FastCUT \
+        --netG         resnet_6blocks \
+        --netD         n_layers \
+        --n_layers_D   5 \
+        --ndf          32 \
+        --normG        instance \
+        --normD        instance \
+        --weight_norm  spectral \
         --dataset_mode aligned \
-        --direction AtoB \
-        --load_size 512 \
-        --crop_size 512 \
-        --phase val \
-        --num_test 9999 \
+        --direction    AtoB \
+        --load_size    512 \
+        --crop_size    512 \
+        --phase        val \
+        --num_test     9999 \
         --no_flip \
-        --unet_seg MIST_unet_seg \
-        --gpu_ids 0
+        --unet_seg     MIST_unet_seg \
+        --gpu_ids      0
 
 # =========================
 # POST-RUN REPORT
@@ -148,4 +152,4 @@ echo "=== GPU log tail ==="
 tail -3 "$VSC_DATA/projects/pspstain/logs/gpu_infer_MIST_512_e100.csv"
 
 echo ""
-echo "MIST-HER2 inference complete. Next step: sbatch eval_MIST_full.sh"
+echo "MIST-HER2 inference complete. Next step: sbatch eval_MIST_512_e100.sh"
