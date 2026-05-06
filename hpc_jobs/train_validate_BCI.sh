@@ -15,6 +15,10 @@
 # Runs 3 epochs of PSPStain training on BCI as a cluster confirmation gate.
 # This job must pass before submitting the full training jobs.
 #
+# NOTE: The cluster's Apptainer auto-binds the host /data/ filesystem into every
+# container, masking any /data/ subdirectories created during the container build.
+# Squashfs archives are therefore mounted to paths under $VSC_SCRATCH instead.
+#
 # Submit: sbatch train_validate_BCI.sh
 #
 # Pass criteria:
@@ -31,6 +35,8 @@ CONTAINER="$VSC_SCRATCH/containers/pspstain_nvidia.sif"
 REPO_DIR="$VSC_DATA/projects/pspstain/code/pspstain"
 CHECKPOINTS_DIR="$VSC_DATA/projects/pspstain/outputs/checkpoints"
 RUN_NAME="BCI_validate_e3"
+BCI_AB_SQSH="$VSC_SCRATCH/BCI-AB.sqsh"
+BCI_AB_MNT="$VSC_SCRATCH/sqsh_mnt/BCI-AB"
 
 # =========================
 # MODULES
@@ -55,11 +61,20 @@ echo "=== Environment ==="
 apptainer exec --nv "$CONTAINER" python -c "import torch; print('torch:', torch.__version__, '| CUDA:', torch.cuda.is_available())"
 
 echo ""
+echo "=== SquashFS check ==="
+if [ ! -f "$BCI_AB_SQSH" ]; then
+    echo "ERROR: BCI-AB squashfs not found: $BCI_AB_SQSH"
+    exit 1
+fi
+echo "  BCI-AB.sqsh found"
+
+echo ""
 echo "=== Dataset check ==="
+mkdir -p "$BCI_AB_MNT"
 apptainer exec \
-    -B "$VSC_SCRATCH/BCI-AB.sqsh:/data/BCI-AB:image-src=/" \
+    -B "$BCI_AB_SQSH:$BCI_AB_MNT:image-src=/" \
     "$CONTAINER" \
-    bash -c 'echo "  trainA: $(ls /data/BCI-AB/trainA | wc -l) images"; echo "  trainB: $(ls /data/BCI-AB/trainB | wc -l) images"; echo "  valA:   $(ls /data/BCI-AB/valA | wc -l) images"; echo "  valB:   $(ls /data/BCI-AB/valB | wc -l) images"'
+    bash -c "echo \"  trainA: \$(ls $BCI_AB_MNT/trainA | wc -l) images\"; echo \"  trainB: \$(ls $BCI_AB_MNT/trainB | wc -l) images\"; echo \"  valA:   \$(ls $BCI_AB_MNT/valA | wc -l) images\"; echo \"  valB:   \$(ls $BCI_AB_MNT/valB | wc -l) images\""
 
 echo ""
 echo "=== Repo check ==="
@@ -97,36 +112,37 @@ echo ""
 echo "=== Starting validation training (3 epochs, BCI) ==="
 echo "  run name    : $RUN_NAME"
 echo "  checkpoints : $CHECKPOINTS_DIR/$RUN_NAME"
+echo "  dataroot    : $BCI_AB_MNT (inside BCI-AB.sqsh)"
 
 apptainer exec --nv \
     -B "$VSC_DATA:$VSC_DATA" \
-    -B "$VSC_SCRATCH/BCI-AB.sqsh:/data/BCI-AB:image-src=/" \
+    -B "$BCI_AB_SQSH:$BCI_AB_MNT:image-src=/" \
     "$CONTAINER" \
     python train.py \
-        --dataroot /data/BCI-AB \
-        --name "$RUN_NAME" \
+        --dataroot     "$BCI_AB_MNT" \
+        --name         "$RUN_NAME" \
         --checkpoints_dir "$CHECKPOINTS_DIR" \
-        --model PSPStain \
-        --CUT_mode FastCUT \
-        --netG resnet_6blocks \
-        --netD n_layers \
-        --n_layers_D 5 \
-        --ndf 32 \
-        --normG instance \
-        --normD instance \
-        --weight_norm spectral \
+        --model        PSPStain \
+        --CUT_mode     FastCUT \
+        --netG         resnet_6blocks \
+        --netD         n_layers \
+        --n_layers_D   5 \
+        --ndf          32 \
+        --normG        instance \
+        --normD        instance \
+        --weight_norm  spectral \
         --dataset_mode aligned \
-        --direction AtoB \
-        --load_size 512 \
-        --crop_size 512 \
-        --batch_size 1 \
-        --n_epochs 3 \
+        --direction    AtoB \
+        --load_size    512 \
+        --crop_size    512 \
+        --batch_size   1 \
+        --n_epochs     3 \
         --n_epochs_decay 0 \
         --save_epoch_freq 1 \
-        --display_id 0 \
+        --display_id   0 \
         --no_html \
-        --unet_seg BCI_unet_seg \
-        --gpu_ids 0
+        --unet_seg     BCI_unet_seg \
+        --gpu_ids      0
 
 # =========================
 # POST-RUN REPORT
