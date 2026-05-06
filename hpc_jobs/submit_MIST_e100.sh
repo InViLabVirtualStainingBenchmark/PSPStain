@@ -5,7 +5,7 @@
 # part 2 only starts if part 1 exits cleanly (no crash, no timeout).
 #
 # Usage (run from the repo root on the login node):
-#   bash hpc_jobs/512_e100/submit_MIST_e100.sh
+#   bash hpc_jobs/submit_MIST_e100.sh
 #
 # What happens:
 #   1. Part 1 is submitted immediately and queued normally.
