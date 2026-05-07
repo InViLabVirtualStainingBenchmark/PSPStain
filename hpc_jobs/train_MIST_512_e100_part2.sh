@@ -132,7 +132,7 @@ apptainer exec --nv \
         --n_epochs        50 \
         --n_epochs_decay  50 \
         --epoch_count     51 \
-        --continue_train \
+        --continue_train True \
         --save_epoch_freq 25 \
         --display_id      0 \
         --no_html \
