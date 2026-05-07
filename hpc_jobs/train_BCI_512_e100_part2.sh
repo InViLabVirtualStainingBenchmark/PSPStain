@@ -34,7 +34,7 @@ set -euo pipefail
 CONTAINER="$VSC_SCRATCH/containers/pspstain_nvidia.sif"
 REPO_DIR="$VSC_DATA/projects/pspstain/code/pspstain"
 CHECKPOINTS_DIR="$VSC_DATA/projects/pspstain/outputs/checkpoints"
-RUN_NAME="BCI_512_e100"
+RUN_NAME="BCI_1024crop_e100"
 BCI_AB_SQSH="$VSC_SCRATCH/BCI-AB.sqsh"
 BCI_AB_MNT="$VSC_SCRATCH/sqsh_mnt/BCI-AB"
 
@@ -126,8 +126,9 @@ apptainer exec --nv \
         --weight_norm     spectral \
         --dataset_mode    aligned \
         --direction       AtoB \
-        --load_size       512 \
+        --load_size       1024 \
         --crop_size       512 \
+        --preprocess      crop \
         --batch_size      1 \
         --n_epochs        50 \
         --n_epochs_decay  50 \

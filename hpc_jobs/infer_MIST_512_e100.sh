@@ -125,8 +125,9 @@ apptainer exec --nv \
         --weight_norm  spectral \
         --dataset_mode aligned \
         --direction    AtoB \
-        --load_size    512 \
-        --crop_size    512 \
+        --load_size    1024 \
+        --crop_size    1024 \
+        --preprocess   none \
         --phase        val \
         --num_test     9999 \
         --no_flip \

@@ -34,7 +34,7 @@ set -euo pipefail
 CONTAINER="$VSC_SCRATCH/containers/pspstain_nvidia.sif"
 REPO_DIR="$VSC_DATA/projects/pspstain/code/pspstain"
 CHECKPOINTS_DIR="$VSC_DATA/projects/pspstain/outputs/checkpoints"
-RUN_NAME="MIST-HER2_512_e100"
+RUN_NAME="MIST-HER2_1024crop_e100"
 MIST_SQSH="$VSC_SCRATCH/MIST-HER2.sqsh"
 MIST_MNT="$VSC_SCRATCH/sqsh_mnt/MIST-HER2"
 
@@ -126,8 +126,9 @@ apptainer exec --nv \
         --weight_norm     spectral \
         --dataset_mode    aligned \
         --direction       AtoB \
-        --load_size       512 \
+        --load_size       1024 \
         --crop_size       512 \
+        --preprocess      crop \
         --batch_size      1 \
         --n_epochs        50 \
         --n_epochs_decay  50 \
