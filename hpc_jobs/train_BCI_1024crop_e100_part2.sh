@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=pspstain_BCI_512_p1
+#SBATCH --job-name=pspstain_BCI_1024crop_p2
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
@@ -8,23 +8,26 @@
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
-#SBATCH -o /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_BCI_512_p1.%j.out
-#SBATCH -e /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_BCI_512_p1.%j.err
+#SBATCH -o /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_BCI_1024crop_p2.%j.out
+#SBATCH -e /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_BCI_1024crop_p2.%j.err
 
-# train_BCI_512_e100_part1.sh
-# Epochs 1-50 of PSPStain training on BCI at 512x512.
-# Constant LR throughout (n_epochs_decay=0).
-# BCI has 3896 training images -- ~14.5 min/epoch, too slow for 100 epochs in one 24h job.
-# This is part 1 of 2. Part 2 resumes from the latest checkpoint and applies LR decay.
+# train_BCI_1024crop_e100_part2.sh
+# Epochs 51-100 of PSPStain training on BCI at 512x512.
+# Resumes from the latest checkpoint saved by part 1.
+# Linear LR decay applied across these 50 epochs (n_epochs_decay=50).
 #
-# DO NOT submit this manually -- use submit_BCI_e100.sh which chains both parts automatically.
+# The LR schedule is equivalent to a single 100-epoch run:
+#   Part 1: epochs  1-50  constant LR  (n_epochs=50, n_epochs_decay=0)
+#   Part 2: epochs 51-100 linear decay (epoch_count=51, n_epochs=50, n_epochs_decay=50)
+#
+# DO NOT submit this manually before part 1 finishes -- use submit_BCI_e100.sh.
+# If part 1 failed or was cancelled, do not submit this script.
 #
 # Monitor:
 #   squeue -u $USER
-#   tail -f $VSC_DATA/projects/pspstain/logs/train_BCI_512_p1.<jobid>.out
+#   tail -f $VSC_DATA/projects/pspstain/logs/train_BCI_1024crop_p2.<jobid>.out
 #
-# Checkpoints saved at epoch 25 and epoch 50 (plus latest after every epoch):
-#   $VSC_DATA/projects/pspstain/outputs/checkpoints/BCI_512_e100/
+# After this job completes, next step: sbatch infer_BCI_1024crop_e100.sh
 
 set -euo pipefail
 
@@ -66,6 +69,17 @@ apptainer exec \
     bash -c "echo \"  trainA: \$(ls $BCI_AB_MNT/trainA | wc -l) images\"; echo \"  trainB: \$(ls $BCI_AB_MNT/trainB | wc -l) images\""
 
 echo ""
+echo "=== Checkpoint check (part 1 must have completed) ==="
+CKPT_DIR="$CHECKPOINTS_DIR/$RUN_NAME"
+if [ ! -f "$CKPT_DIR/latest_net_G.pth" ]; then
+    echo "ERROR: latest_net_G.pth not found in $CKPT_DIR"
+    echo "Has part 1 completed successfully?"
+    exit 1
+fi
+echo "  latest checkpoint found:"
+find "$CKPT_DIR" -name "latest_net_*.pth" | sort
+
+echo ""
 echo "=== UNet weights check ==="
 if [ ! -f "$REPO_DIR/pretrain/BCI_unet_seg.pth" ]; then
     echo "ERROR: pretrain/BCI_unet_seg.pth not found"
@@ -73,15 +87,13 @@ if [ ! -f "$REPO_DIR/pretrain/BCI_unet_seg.pth" ]; then
 fi
 echo "  BCI_unet_seg.pth found"
 
-mkdir -p "$CHECKPOINTS_DIR/$RUN_NAME"
-
 # =========================
 # GPU LOGGING
 # =========================
 
 nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
            --format=csv -l 5 \
-    > "$VSC_DATA/projects/pspstain/logs/gpu_train_BCI_512_p1.csv" & GPU_LOG_PID=$!
+    > "$VSC_DATA/projects/pspstain/logs/gpu_train_BCI_1024crop_p2.csv" & GPU_LOG_PID=$!
 
 # =========================
 # TRAINING
@@ -90,7 +102,7 @@ nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
 cd "$REPO_DIR"
 
 echo ""
-echo "=== Starting BCI training part 1 (epochs 1-50, constant LR) ==="
+echo "=== Starting BCI training part 2 (epochs 51-100, LR decay) ==="
 echo "  run name    : $RUN_NAME"
 echo "  checkpoints : $CHECKPOINTS_DIR/$RUN_NAME"
 echo "  dataroot    : $BCI_AB_MNT (inside BCI-AB.sqsh)"
@@ -119,7 +131,9 @@ apptainer exec --nv \
         --preprocess      crop \
         --batch_size      1 \
         --n_epochs        50 \
-        --n_epochs_decay  0 \
+        --n_epochs_decay  50 \
+        --epoch_count     51 \
+        --continue_train True \
         --save_epoch_freq 25 \
         --display_id      0 \
         --no_html \
@@ -138,7 +152,7 @@ find "$CHECKPOINTS_DIR/$RUN_NAME" -name "*.pth" | sort
 
 echo ""
 echo "=== GPU log tail ==="
-tail -3 "$VSC_DATA/projects/pspstain/logs/gpu_train_BCI_512_p1.csv"
+tail -3 "$VSC_DATA/projects/pspstain/logs/gpu_train_BCI_1024crop_p2.csv"
 
 echo ""
-echo "BCI part 1 complete (epochs 1-50). Part 2 should start automatically if submitted via wrapper."
+echo "BCI full training complete (epochs 1-100). Next step: sbatch infer_BCI_1024crop_e100.sh"

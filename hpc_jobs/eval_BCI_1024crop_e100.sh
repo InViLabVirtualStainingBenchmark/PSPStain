@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=pspstain_eval_MIST_512_e100
+#SBATCH --job-name=pspstain_eval_BCI_1024crop_e100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
@@ -8,15 +8,15 @@
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
-#SBATCH -o /data/antwerpen/212/vsc21212/projects/pspstain/logs/eval_MIST_512_e100.%j.out
-#SBATCH -e /data/antwerpen/212/vsc21212/projects/pspstain/logs/eval_MIST_512_e100.%j.err
+#SBATCH -o /data/antwerpen/212/vsc21212/projects/pspstain/logs/eval_BCI_1024crop_e100.%j.out
+#SBATCH -e /data/antwerpen/212/vsc21212/projects/pspstain/logs/eval_BCI_1024crop_e100.%j.err
 
-# eval_MIST_512_e100.sh
-# Runs evaluate.py on PSPStain MIST-HER2 inference outputs using the shared
+# eval_BCI_1024crop_e100.sh
+# Runs evaluate.py on PSPStain BCI inference outputs using the shared
 # evaluate_nvidia.sif container.
 #
-# Submit ONLY after infer_MIST_512_e100.sh has completed and image count is correct.
-# Submit: sbatch eval_MIST_512_e100.sh
+# Submit ONLY after infer_BCI_1024crop_e100.sh has completed and image count is correct.
+# Submit: sbatch eval_BCI_1024crop_e100.sh
 #
 # Results appended to:
 #   $VSC_DATA/benchmark_results.csv
@@ -25,11 +25,11 @@ set -euo pipefail
 
 EVAL_CONTAINER="$VSC_SCRATCH/containers/evaluate_nvidia.sif"
 RESULTS_DIR="$VSC_DATA/projects/pspstain/outputs/results"
-RUN_NAME="MIST-HER2_512_e100"
+RUN_NAME="BCI_1024crop_e100"
 PRED_DIR="$RESULTS_DIR/$RUN_NAME/val_latest/images/fake_B"
-MIST_SQSH="$VSC_SCRATCH/MIST-HER2.sqsh"
-MIST_MNT="$VSC_SCRATCH/sqsh_mnt/MIST-HER2"
-GT_DIR="$MIST_MNT/valB"
+BCI_AB_SQSH="$VSC_SCRATCH/BCI-AB.sqsh"
+BCI_AB_MNT="$VSC_SCRATCH/sqsh_mnt/BCI-AB"
+GT_DIR="$BCI_AB_MNT/valB"
 
 # =========================
 # MODULES
@@ -51,17 +51,17 @@ echo "  found"
 
 echo ""
 echo "=== SquashFS check ==="
-if [ ! -f "$MIST_SQSH" ]; then
-    echo "ERROR: MIST-HER2 squashfs not found: $MIST_SQSH"
+if [ ! -f "$BCI_AB_SQSH" ]; then
+    echo "ERROR: BCI-AB squashfs not found: $BCI_AB_SQSH"
     exit 1
 fi
-echo "  MIST-HER2.sqsh found"
+echo "  BCI-AB.sqsh found"
 
 echo ""
 echo "=== Prediction folder check ==="
 if [ ! -d "$PRED_DIR" ]; then
     echo "ERROR: Prediction folder not found: $PRED_DIR"
-    echo "Has infer_MIST_512_e100.sh completed successfully?"
+    echo "Has infer_BCI_1024crop_e100.sh completed successfully?"
     exit 1
 fi
 echo "  fake_B images: $(find "$PRED_DIR" -name "*.png" | wc -l)"
@@ -70,22 +70,22 @@ echo "  fake_B images: $(find "$PRED_DIR" -name "*.png" | wc -l)"
 # EVALUATION
 # =========================
 
-mkdir -p "$MIST_MNT"
+mkdir -p "$BCI_AB_MNT"
 
 echo ""
-echo "=== Starting MIST-HER2 evaluation ==="
+echo "=== Starting BCI evaluation ==="
 echo "  predictions : $PRED_DIR"
-echo "  ground truth: $GT_DIR (inside MIST-HER2.sqsh)"
+echo "  ground truth: $GT_DIR (inside BCI-AB.sqsh)"
 
 srun apptainer exec --nv \
     -B "$VSC_DATA:$VSC_DATA" \
-    -B "$MIST_SQSH:$MIST_MNT:image-src=/" \
+    -B "$BCI_AB_SQSH:$BCI_AB_MNT:image-src=/" \
     "$EVAL_CONTAINER" \
     python "$VSC_DATA/evaluate/evaluate.py" \
         --pred         "$PRED_DIR" \
         --gt           "$GT_DIR" \
         --model_name   PSPStain \
-        --dataset_name MIST-HER2 \
+        --dataset_name BCI \
         --split_name   full_e100 \
         --match_by     stem \
         --output       "$VSC_DATA/benchmark_results.csv" \
@@ -102,4 +102,4 @@ echo "=== benchmark_results.csv (last 3 rows) ==="
 tail -3 "$VSC_DATA/benchmark_results.csv"
 
 echo ""
-echo "MIST-HER2 evaluation complete."
+echo "BCI evaluation complete."

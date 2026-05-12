@@ -20,11 +20,11 @@
 #   scancel <part1_jobid> <part2_jobid>
 #
 # After both jobs finish, submit inference:
-#   sbatch hpc_jobs/512_e100/infer_MIST_512_e100.sh
+#   sbatch hpc_jobs/infer_MIST_1024crop_e100.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PART1="$SCRIPT_DIR/train_MIST_512_e100_part1.sh"
-PART2="$SCRIPT_DIR/train_MIST_512_e100_part2.sh"
+PART1="$SCRIPT_DIR/train_MIST_1024crop_e100_part1.sh"
+PART2="$SCRIPT_DIR/train_MIST_1024crop_e100_part2.sh"
 
 if [ ! -f "$PART1" ]; then
     echo "ERROR: $PART1 not found."
@@ -46,8 +46,8 @@ echo "  Part 2 will only start if part 1 exits successfully."
 
 echo ""
 echo "Monitor with: squeue -u \$USER"
-echo "Part 1 log:   tail -f \$VSC_DATA/projects/pspstain/logs/train_MIST_512_p1.$JOB1.out"
-echo "Part 2 log:   tail -f \$VSC_DATA/projects/pspstain/logs/train_MIST_512_p2.$JOB2.out"
+echo "Part 1 log:   tail -f \$VSC_DATA/projects/pspstain/logs/train_MIST_1024crop_p1.$JOB1.out"
+echo "Part 2 log:   tail -f \$VSC_DATA/projects/pspstain/logs/train_MIST_1024crop_p2.$JOB2.out"
 echo ""
 echo "After both complete, submit inference:"
-echo "  sbatch hpc_jobs/512_e100/infer_MIST_512_e100.sh"
+echo "  sbatch hpc_jobs/infer_MIST_1024crop_e100.sh"

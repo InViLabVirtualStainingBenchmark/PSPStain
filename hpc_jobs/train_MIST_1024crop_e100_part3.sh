@@ -1,42 +1,50 @@
 #!/bin/bash
-#SBATCH --job-name=pspstain_BCI_512_p2
+#SBATCH --job-name=pspstain_MIST_1024crop_p3
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=60G
-#SBATCH --time=14:00:00
+#SBATCH --time=02:30:00
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
-#SBATCH -o /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_BCI_512_p2.%j.out
-#SBATCH -e /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_BCI_512_p2.%j.err
+#SBATCH -o /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_MIST_1024crop_p3.%j.out
+#SBATCH -e /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_MIST_1024crop_p3.%j.err
 
-# train_BCI_512_e100_part2.sh
-# Epochs 51-100 of PSPStain training on BCI at 512x512.
-# Resumes from the latest checkpoint saved by part 1.
-# Linear LR decay applied across these 50 epochs (n_epochs_decay=50).
+# train_MIST_1024crop_e100_part3.sh
+# Epochs 99-100 of PSPStain training on MIST-HER2 at 512x512.
+# Resumes from the latest checkpoint saved by part 2 (epoch 98, total_iters 220000).
 #
-# The LR schedule is equivalent to a single 100-epoch run:
-#   Part 1: epochs  1-50  constant LR  (n_epochs=50, n_epochs_decay=0)
-#   Part 2: epochs 51-100 linear decay (epoch_count=51, n_epochs=50, n_epochs_decay=50)
+# Part 2 was cancelled by the cluster time limit at the end of epoch 98.
+# The loop range is determined by:
+#   range(epoch_count, n_epochs + n_epochs_decay + 1)
+#   range(99, 50 + 50 + 1) = range(99, 101) => epochs 99 and 100
 #
-# DO NOT submit this manually before part 1 finishes -- use submit_BCI_e100.sh.
-# If part 1 failed or was cancelled, do not submit this script.
+# LR schedule context (full 100-epoch run):
+#   Part 1: epochs  1-50   constant LR  (n_epochs=50, n_epochs_decay=0)
+#   Part 2: epochs 51-100  linear decay (epoch_count=51, n_epochs=50, n_epochs_decay=50)
+#   Part 3: epochs 99-100  same decay params, epoch_count=99 to restrict the loop
+#
+# Note: because the LR scheduler is re-initialised from the saved optimiser state,
+# the decay will be approximately correct for these final two epochs (~0.002 base LR).
+# The difference is negligible at this stage of training.
+#
+# DO NOT submit this before part 2 has completed (or been cancelled with checkpoints intact).
 #
 # Monitor:
 #   squeue -u $USER
-#   tail -f $VSC_DATA/projects/pspstain/logs/train_BCI_512_p2.<jobid>.out
+#   tail -f $VSC_DATA/projects/pspstain/logs/train_MIST_1024crop_p3.<jobid>.out
 #
-# After this job completes, next step: sbatch infer_BCI_512_e100.sh
+# After this job completes, next step: sbatch infer_MIST_1024crop_e100.sh
 
 set -euo pipefail
 
 CONTAINER="$VSC_SCRATCH/containers/pspstain_nvidia.sif"
 REPO_DIR="$VSC_DATA/projects/pspstain/code/pspstain"
 CHECKPOINTS_DIR="$VSC_DATA/projects/pspstain/outputs/checkpoints"
-RUN_NAME="BCI_1024crop_e100"
-BCI_AB_SQSH="$VSC_SCRATCH/BCI-AB.sqsh"
-BCI_AB_MNT="$VSC_SCRATCH/sqsh_mnt/BCI-AB"
+RUN_NAME="MIST-HER2_1024crop_e100"
+MIST_SQSH="$VSC_SCRATCH/MIST-HER2.sqsh"
+MIST_MNT="$VSC_SCRATCH/sqsh_mnt/MIST-HER2"
 
 # =========================
 # MODULES
@@ -62,30 +70,33 @@ apptainer exec --nv "$CONTAINER" python -c "import torch; print('torch:', torch.
 
 echo ""
 echo "=== Dataset check ==="
-mkdir -p "$BCI_AB_MNT"
+mkdir -p "$MIST_MNT"
 apptainer exec \
-    -B "$BCI_AB_SQSH:$BCI_AB_MNT:image-src=/" \
+    -B "$MIST_SQSH:$MIST_MNT:image-src=/" \
     "$CONTAINER" \
-    bash -c "echo \"  trainA: \$(ls $BCI_AB_MNT/trainA | wc -l) images\"; echo \"  trainB: \$(ls $BCI_AB_MNT/trainB | wc -l) images\""
+    bash -c "echo \"  trainA: \$(ls $MIST_MNT/trainA | wc -l) images\"; echo \"  trainB: \$(ls $MIST_MNT/trainB | wc -l) images\""
 
 echo ""
-echo "=== Checkpoint check (part 1 must have completed) ==="
+echo "=== Checkpoint check (part 2 epoch 98 must exist) ==="
 CKPT_DIR="$CHECKPOINTS_DIR/$RUN_NAME"
 if [ ! -f "$CKPT_DIR/latest_net_G.pth" ]; then
     echo "ERROR: latest_net_G.pth not found in $CKPT_DIR"
-    echo "Has part 1 completed successfully?"
+    echo "Has part 2 completed or saved at least one checkpoint?"
     exit 1
 fi
 echo "  latest checkpoint found:"
 find "$CKPT_DIR" -name "latest_net_*.pth" | sort
+echo ""
+echo "  all checkpoints in run directory:"
+find "$CKPT_DIR" -name "*.pth" | sort
 
 echo ""
 echo "=== UNet weights check ==="
-if [ ! -f "$REPO_DIR/pretrain/BCI_unet_seg.pth" ]; then
-    echo "ERROR: pretrain/BCI_unet_seg.pth not found"
+if [ ! -f "$REPO_DIR/pretrain/MIST_unet_seg.pth" ]; then
+    echo "ERROR: pretrain/MIST_unet_seg.pth not found"
     exit 1
 fi
-echo "  BCI_unet_seg.pth found"
+echo "  MIST_unet_seg.pth found"
 
 # =========================
 # GPU LOGGING
@@ -93,7 +104,7 @@ echo "  BCI_unet_seg.pth found"
 
 nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
            --format=csv -l 5 \
-    > "$VSC_DATA/projects/pspstain/logs/gpu_train_BCI_512_p2.csv" & GPU_LOG_PID=$!
+    > "$VSC_DATA/projects/pspstain/logs/gpu_train_MIST_1024crop_p3.csv" & GPU_LOG_PID=$!
 
 # =========================
 # TRAINING
@@ -102,17 +113,18 @@ nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
 cd "$REPO_DIR"
 
 echo ""
-echo "=== Starting BCI training part 2 (epochs 51-100, LR decay) ==="
+echo "=== Starting MIST-HER2 training part 3 (epochs 99-100, final LR decay) ==="
 echo "  run name    : $RUN_NAME"
 echo "  checkpoints : $CHECKPOINTS_DIR/$RUN_NAME"
-echo "  dataroot    : $BCI_AB_MNT (inside BCI-AB.sqsh)"
+echo "  dataroot    : $MIST_MNT (inside MIST-HER2.sqsh)"
+echo "  resuming from latest checkpoint (epoch 98)"
 
 apptainer exec --nv \
     -B "$VSC_DATA:$VSC_DATA" \
-    -B "$BCI_AB_SQSH:$BCI_AB_MNT:image-src=/" \
+    -B "$MIST_SQSH:$MIST_MNT:image-src=/" \
     "$CONTAINER" \
     python train.py \
-        --dataroot        "$BCI_AB_MNT" \
+        --dataroot        "$MIST_MNT" \
         --name            "$RUN_NAME" \
         --checkpoints_dir "$CHECKPOINTS_DIR" \
         --model           PSPStain \
@@ -132,12 +144,12 @@ apptainer exec --nv \
         --batch_size      1 \
         --n_epochs        50 \
         --n_epochs_decay  50 \
-        --epoch_count     51 \
+        --epoch_count     99 \
         --continue_train True \
-        --save_epoch_freq 25 \
+        --save_epoch_freq 1 \
         --display_id      0 \
         --no_html \
-        --unet_seg        BCI_unet_seg \
+        --unet_seg        MIST_unet_seg \
         --gpu_ids         0
 
 # =========================
@@ -152,7 +164,7 @@ find "$CHECKPOINTS_DIR/$RUN_NAME" -name "*.pth" | sort
 
 echo ""
 echo "=== GPU log tail ==="
-tail -3 "$VSC_DATA/projects/pspstain/logs/gpu_train_BCI_512_p2.csv"
+tail -3 "$VSC_DATA/projects/pspstain/logs/gpu_train_MIST_1024crop_p3.csv"
 
 echo ""
-echo "BCI full training complete (epochs 1-100). Next step: sbatch infer_BCI_512_e100.sh"
+echo "MIST-HER2 full training complete (epochs 1-100). Next step: sbatch infer_MIST_1024crop_e100.sh"

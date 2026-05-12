@@ -1,35 +1,37 @@
 #!/bin/bash
-#SBATCH --job-name=pspstain_train_MIST_512_e100
+#SBATCH --job-name=pspstain_MIST_1024crop_p1
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=60G
-#SBATCH --time=XX:00:00
+#SBATCH --time=20:00:00
 #SBATCH -A ap_invilab_td_thesis
 #SBATCH -p ampere_gpu
 #SBATCH --gres=gpu:1
-#SBATCH -o /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_MIST_512_e100.%j.out
-#SBATCH -e /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_MIST_512_e100.%j.err
+#SBATCH -o /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_MIST_1024crop_p1.%j.out
+#SBATCH -e /data/antwerpen/212/vsc21212/projects/pspstain/logs/train_MIST_1024crop_p1.%j.err
 
-# train_MIST_512_e100.sh
-# Full 100-epoch PSPStain training on the MIST-HER2 dataset.
-# 50 epochs constant LR + 50 epochs linear LR decay = 100 total.
+# train_MIST_1024crop_e100_part1.sh
+# Epochs 1-50 of PSPStain training on MIST-HER2 at 512x512.
+# Constant LR throughout (n_epochs_decay=0).
+# MIST-HER2 has 4642 training images -- ~17.3 min/epoch, too slow for 100 epochs in one 24h job.
+# This is part 1 of 2. Part 2 resumes from the latest checkpoint and applies LR decay.
 #
-# TODO: Replace XX:00:00 above with the correct wall time before submitting.
-#       Use the time-per-epoch from the BCI full training log as a rough guide.
+# DO NOT submit this manually -- use submit_MIST_e100.sh which chains both parts automatically.
 #
-# Submit: sbatch train_MIST_512_e100.sh
-# Can be submitted in parallel with train_BCI_512_e100.sh if GPU quota allows.
+# Monitor:
+#   squeue -u $USER
+#   tail -f $VSC_DATA/projects/pspstain/logs/train_MIST_1024crop_p1.<jobid>.out
 #
-# Checkpoints saved at epochs 25, 50, 75, and 100 (plus latest after every epoch):
-#   $VSC_DATA/projects/pspstain/outputs/checkpoints/MIST-HER2_full_e100/
+# Checkpoints saved at epoch 25 and epoch 50 (plus latest after every epoch):
+#   $VSC_DATA/projects/pspstain/outputs/checkpoints/MIST-HER2_1024crop_e100/
 
 set -euo pipefail
 
 CONTAINER="$VSC_SCRATCH/containers/pspstain_nvidia.sif"
 REPO_DIR="$VSC_DATA/projects/pspstain/code/pspstain"
 CHECKPOINTS_DIR="$VSC_DATA/projects/pspstain/outputs/checkpoints"
-RUN_NAME="MIST-HER2_512_e100"
+RUN_NAME="MIST-HER2_1024crop_e100"
 MIST_SQSH="$VSC_SCRATCH/MIST-HER2.sqsh"
 MIST_MNT="$VSC_SCRATCH/sqsh_mnt/MIST-HER2"
 
@@ -79,7 +81,7 @@ mkdir -p "$CHECKPOINTS_DIR/$RUN_NAME"
 
 nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
            --format=csv -l 5 \
-    > "$VSC_DATA/projects/pspstain/logs/gpu_train_MIST_512_e100.csv" & GPU_LOG_PID=$!
+    > "$VSC_DATA/projects/pspstain/logs/gpu_train_MIST_1024crop_p1.csv" & GPU_LOG_PID=$!
 
 # =========================
 # TRAINING
@@ -88,7 +90,7 @@ nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
 cd "$REPO_DIR"
 
 echo ""
-echo "=== Starting full MIST-HER2 training (100 epochs) ==="
+echo "=== Starting MIST-HER2 training part 1 (epochs 1-50, constant LR) ==="
 echo "  run name    : $RUN_NAME"
 echo "  checkpoints : $CHECKPOINTS_DIR/$RUN_NAME"
 echo "  dataroot    : $MIST_MNT (inside MIST-HER2.sqsh)"
@@ -98,30 +100,31 @@ apptainer exec --nv \
     -B "$MIST_SQSH:$MIST_MNT:image-src=/" \
     "$CONTAINER" \
     python train.py \
-        --dataroot     "$MIST_MNT" \
-        --name         "$RUN_NAME" \
+        --dataroot        "$MIST_MNT" \
+        --name            "$RUN_NAME" \
         --checkpoints_dir "$CHECKPOINTS_DIR" \
-        --model        PSPStain \
-        --CUT_mode     FastCUT \
-        --netG         resnet_6blocks \
-        --netD         n_layers \
-        --n_layers_D   5 \
-        --ndf          32 \
-        --normG        instance \
-        --normD        instance \
-        --weight_norm  spectral \
-        --dataset_mode aligned \
-        --direction    AtoB \
-        --load_size    512 \
-        --crop_size    512 \
-        --batch_size   1 \
-        --n_epochs     50 \
-        --n_epochs_decay 50 \
+        --model           PSPStain \
+        --CUT_mode        FastCUT \
+        --netG            resnet_6blocks \
+        --netD            n_layers \
+        --n_layers_D      5 \
+        --ndf             32 \
+        --normG           instance \
+        --normD           instance \
+        --weight_norm     spectral \
+        --dataset_mode    aligned \
+        --direction       AtoB \
+        --load_size       1024 \
+        --crop_size       512 \
+        --preprocess      crop \
+        --batch_size      1 \
+        --n_epochs        50 \
+        --n_epochs_decay  0 \
         --save_epoch_freq 25 \
-        --display_id   0 \
+        --display_id      0 \
         --no_html \
-        --unet_seg     MIST_unet_seg \
-        --gpu_ids      0
+        --unet_seg        MIST_unet_seg \
+        --gpu_ids         0
 
 # =========================
 # POST-RUN REPORT
@@ -135,7 +138,7 @@ find "$CHECKPOINTS_DIR/$RUN_NAME" -name "*.pth" | sort
 
 echo ""
 echo "=== GPU log tail ==="
-tail -3 "$VSC_DATA/projects/pspstain/logs/gpu_train_MIST_512_e100.csv"
+tail -3 "$VSC_DATA/projects/pspstain/logs/gpu_train_MIST_1024crop_p1.csv"
 
 echo ""
-echo "MIST-HER2 full training complete. Next step: sbatch infer_MIST_512_e100.sh"
+echo "MIST-HER2 part 1 complete (epochs 1-50). Part 2 should start automatically if submitted via wrapper."
