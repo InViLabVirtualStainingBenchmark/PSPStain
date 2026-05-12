@@ -95,7 +95,7 @@ echo "  run name    : $RUN_NAME"
 echo "  checkpoints : $CHECKPOINTS_DIR/$RUN_NAME"
 echo "  dataroot    : $MIST_MNT (inside MIST-HER2.sqsh)"
 
-apptainer exec --nv \
+srun apptainer exec --nv \
     -B "$VSC_DATA:$VSC_DATA" \
     -B "$MIST_SQSH:$MIST_MNT:image-src=/" \
     "$CONTAINER" \
