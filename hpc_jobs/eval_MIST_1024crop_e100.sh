@@ -86,7 +86,7 @@ srun apptainer exec --nv \
         --gt           "$GT_DIR" \
         --model_name   PSPStain \
         --dataset_name MIST-HER2 \
-        --split_name   full_e100 \
+        --split_name   val \
         --match_by     stem \
         --output       "$VSC_DATA/benchmark_results.csv" \
         --cellpose \

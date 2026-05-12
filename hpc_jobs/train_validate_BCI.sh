@@ -109,7 +109,7 @@ nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
 cd "$REPO_DIR"
 
 echo ""
-echo "=== Starting validation training (3 epochs, BCI) ==="
+echo "=== Starting validation training (3 epochs, BCI, load 1024, crop 512) ==="
 echo "  run name    : $RUN_NAME"
 echo "  checkpoints : $CHECKPOINTS_DIR/$RUN_NAME"
 echo "  dataroot    : $BCI_AB_MNT (inside BCI-AB.sqsh)"
@@ -133,8 +133,9 @@ apptainer exec --nv \
         --weight_norm  spectral \
         --dataset_mode aligned \
         --direction    AtoB \
-        --load_size    512 \
+        --load_size    1024 \
         --crop_size    512 \
+        --preprocess   crop \
         --batch_size   1 \
         --n_epochs     3 \
         --n_epochs_decay 0 \
